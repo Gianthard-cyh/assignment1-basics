@@ -135,7 +135,7 @@ def train_bpe(
     merges: list[tuple[bytes, bytes]] = []
 
     with _load_file(input_path) as file:
-        pretokens, adj, heap = _pretokenize(file)
+        adj, heap = _pretokenize(file)
 
     while len(vocab) <= vocab_size:
         _merge(vocab, adj, heap, merges)
@@ -152,7 +152,7 @@ def _load_file(path: str | os.PathLike):
 
 def _pretokenize(
     file: typing.BinaryIO,
-) -> tuple[dict[bytes, Pretoken], dict[tuple[bytes, bytes], AdjacentPair], PairHeap]:
+) -> tuple[dict[tuple[bytes, bytes], AdjacentPair], PairHeap]:
     num_processes = 4
     boundaries = find_chunk_boundaries(file, num_processes, b"<|endoftext|>")
 
@@ -165,28 +165,28 @@ def _pretokenize(
         chunk_pretoken_counts = Counter(chunk_pretokens)
         counter += chunk_pretoken_counts
 
-    pretokens: dict[bytes, Pretoken] = {}
+    pretokens: list[Pretoken] = []
     for k, v in counter.items():
         b = k.encode()
         pretoken_tuple = tuple(b[i : i + 1] for i in range(len(b)))
-        pretokens[b] = Pretoken(pretoken_tuple, v)
+        pretokens.append(Pretoken(pretoken_tuple, v))
 
     pairs: dict[tuple[bytes, bytes], AdjacentPair] = {}
-    for k, v in pretokens.items():
-        for i in range(0, len(k) - 1):
-            adj_tuple = (k[i].to_bytes(), k[i + 1].to_bytes())
+    for k in pretokens:
+        for i in range(0, len(k.tokens) - 1):
+            adj_tuple = (k.tokens[i], k.tokens[i + 1])
             if adj_tuple in pairs:
                 pair = pairs[adj_tuple]
             else:
-                pair = pairs[adj_tuple] = AdjacentPair(k[i].to_bytes(), k[i + 1].to_bytes(), 0, [])
-            pair.count += v.count
-            pair.occurrences.append(v)
+                pair = pairs[adj_tuple] = AdjacentPair(k.tokens[i], k.tokens[i + 1], 0, [])
+            pair.count += k.count
+            pair.occurrences.append(k)
 
     heap = PairHeap()
     for k, v in pairs.items():
         heap.push(v)
 
-    return (pretokens, pairs, heap)
+    return (pairs, heap)
 
 
 def _init_vocab(special_tokens: list[str]) -> dict[int, bytes]:
