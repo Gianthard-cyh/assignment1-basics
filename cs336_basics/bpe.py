@@ -79,21 +79,20 @@ class PairHeap:
         del self.index_map[removed.get_tuple()]
 
         if idx < len(self.hp):
-            self._sift_up(idx)
+            idx = self._sift_up(idx)
             self._sift_down(idx)
 
     def update_count(self, x: AdjacentPair, new_count: int) -> None:
         if x.get_tuple() not in self.index_map:
             return
         idx = self.index_map[x.get_tuple()]
-        old_count = x.count
-        x.count = new_count
-        if new_count > old_count:
-            self._sift_up(idx)
-        else:
-            self._sift_down(idx)
+        target = self.hp[idx]
+        target.count = new_count
+        
+        idx = self._sift_up(idx)
+        self._sift_down(idx)
 
-    def _sift_up(self, idx: int) -> None:
+    def _sift_up(self, idx: int) -> int:
         while idx > 0:
             parent = (idx - 1) // 2
             if self.hp[idx] > self.hp[parent]:
@@ -101,21 +100,23 @@ class PairHeap:
                 idx = parent
             else:
                 break
+        return idx
 
-    def _sift_down(self, idx: int) -> None:
+    def _sift_down(self, idx: int) -> int:
         n = len(self.hp)
         while True:
             left = 2 * idx + 1
             right = 2 * idx + 2
-            smallest = idx
-            if left < n and self.hp[left] > self.hp[smallest]:
-                smallest = left
-            if right < n and self.hp[right] > self.hp[smallest]:
-                smallest = right
-            if smallest == idx:
+            largest = idx
+            if left < n and self.hp[left] > self.hp[largest]:
+                largest = left
+            if right < n and self.hp[right] > self.hp[largest]:
+                largest = right
+            if largest == idx:
                 break
-            self._swap(idx, smallest)
-            idx = smallest
+            self._swap(idx, largest)
+            idx = largest
+        return idx
 
     def _swap(self, i: int, j: int) -> None:
         self.hp[i], self.hp[j] = self.hp[j], self.hp[i]
@@ -137,7 +138,7 @@ def train_bpe(
     with _load_file(input_path) as file:
         adj, heap = _pretokenize(file)
 
-    while len(vocab) <= vocab_size:
+    while len(vocab) < vocab_size:
         _merge(vocab, adj, heap, merges)
 
     return (vocab, merges)
@@ -255,7 +256,7 @@ def _merge_pretoken(
     if pair.count == 0:
         del pairs[pair.get_tuple()]
 
-    if pos - 1 > 0:
+    if pos - 1 >= 0:
         _remove_pair((old_tokens[pos - 1], old_tokens[pos]), pretok.count, pairs, heap)
         _push_pair((old_tokens[pos - 1], merged_token), pairs, heap, pretok)
 
@@ -273,12 +274,12 @@ def _remove_pair(
     heap: PairHeap,
 ):
     pair = adj[pair_tuple]
-    pair.count -= count
-    if pair.count == 0:
+    newcount = pair.count - count
+    if newcount == 0:
         heap.remove(pair)
         del adj[pair_tuple]
     else:
-        heap.update_count(pair, pair.count)
+        heap.update_count(pair, newcount)
 
 
 def _push_pair(
@@ -286,10 +287,10 @@ def _push_pair(
 ):
     if pair_tuple in adj:
         pair = adj[pair_tuple]
-        pair.count += pretoken.count
+        newcount = pair.count + pretoken.count
         if pretoken not in pair.occurrences:
             pair.occurrences.append(pretoken)
-        heap.update_count(pair, pair.count)
+        heap.update_count(pair, newcount)
     else:
         pair = adj[pair_tuple] = AdjacentPair(pair_tuple[0], pair_tuple[1], pretoken.count, [pretoken])
         adj[pair_tuple] = pair
