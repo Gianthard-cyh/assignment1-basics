@@ -88,7 +88,7 @@ class PairHeap:
         idx = self.index_map[x.get_tuple()]
         target = self.hp[idx]
         target.count = new_count
-        
+
         idx = self._sift_up(idx)
         self._sift_down(idx)
 
@@ -136,10 +136,13 @@ def train_bpe(
     merges: list[tuple[bytes, bytes]] = []
 
     with _load_file(input_path) as file:
-        adj, heap = _pretokenize(file)
+        adj, heap = _pretokenize(file, special_tokens)
 
     while len(vocab) < vocab_size:
         _merge(vocab, adj, heap, merges)
+
+    print("====================== Vocab ======================")
+    print(vocab)
 
     return (vocab, merges)
 
@@ -152,7 +155,7 @@ def _load_file(path: str | os.PathLike):
 
 
 def _pretokenize(
-    file: typing.BinaryIO,
+    file: typing.BinaryIO, special_tokens: list[str]
 ) -> tuple[dict[tuple[bytes, bytes], AdjacentPair], PairHeap]:
     num_processes = 4
     boundaries = find_chunk_boundaries(file, num_processes, b"<|endoftext|>")
@@ -162,9 +165,12 @@ def _pretokenize(
     for start, end in zip(boundaries[:-1], boundaries[1:]):
         file.seek(start)
         chunk = file.read(end - start).decode("utf-8", errors="ignore")
-        chunk_pretokens = re.findall(PRETOKENIZE_PAT, chunk)
-        chunk_pretoken_counts = Counter(chunk_pretokens)
-        counter += chunk_pretoken_counts
+        special_tokens_pat = "|".join([re.escape(i) for i in special_tokens])
+        partitions = re.split(special_tokens_pat, chunk)
+        for partition in partitions:
+            chunk_pretokens = re.findall(PRETOKENIZE_PAT, partition)
+            chunk_pretoken_counts = Counter(chunk_pretokens)
+            counter += chunk_pretoken_counts
 
     pretokens: list[Pretoken] = []
     for k, v in counter.items():
