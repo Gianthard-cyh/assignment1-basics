@@ -20,6 +20,7 @@ dependencies = [
     "wandb>=0.19.7",
     "ty>=0.0.1a16",
     "rich>=14.3.3",
+    "viztracer>=1.1.1",
 ]
 
 [build-system]

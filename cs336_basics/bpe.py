@@ -1,8 +1,12 @@
 from dataclasses import dataclass
+from functools import partial
 import os
 import typing
 import regex as re
 from collections import Counter
+from rich.progress import track
+from multiprocessing import Process, Lock, Pool
+from multiprocessing.synchronize import Lock as LockType
 
 from cs336_basics.pretokenization_example import find_chunk_boundaries
 
@@ -11,6 +15,8 @@ The Byte Pair Encoding (BPE) algorithm.
 """
 
 PRETOKENIZE_PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+PRETOKENIZE_BATCHSIZE = 1000
+pretokenize_lock = Lock()
 
 
 @dataclass
@@ -55,7 +61,7 @@ class PairHeap:
         if not self.hp:
             raise IndexError("pop from empty heap")
         top = self.hp[0]
-        print(f"[pop] {top.get_tuple()}")
+        # print(f"[pop] {top.get_tuple()}")
         last = self.hp.pop()
         del self.index_map[top.get_tuple()]
         if self.hp:
@@ -68,7 +74,7 @@ class PairHeap:
         return self.hp[0]
 
     def remove(self, x: AdjacentPair) -> None:
-        print(f"[remove] {x.get_tuple()}")
+        # print(f"[remove] {x.get_tuple()}")
         if x.get_tuple() not in self.index_map:
             return
         idx = self.index_map[x.get_tuple()]
@@ -154,23 +160,40 @@ def _load_file(path: str | os.PathLike):
     return open(path, "rb")
 
 
+def _process_mini_chunk(mini_chunks: list[str]):
+    counter = Counter()
+    for mini_chunk in mini_chunks:
+        chunk_pretokens = re.findall(PRETOKENIZE_PAT, mini_chunk)
+        chunk_pretoken_counts = Counter(chunk_pretokens)
+        counter += chunk_pretoken_counts
+    return counter
+
+
 def _pretokenize(
     file: typing.BinaryIO, special_tokens: list[str]
 ) -> tuple[dict[tuple[bytes, bytes], AdjacentPair], PairHeap]:
-    num_processes = 4
+    num_processes = 16
+    print("begin find_chunk_boundaries")
     boundaries = find_chunk_boundaries(file, num_processes, b"<|endoftext|>")
+    print(f"{len(boundaries)} boundaries found")
 
-    counter = Counter[str]()
-
-    for start, end in zip(boundaries[:-1], boundaries[1:]):
+    mini_chunks: list[str] = []
+    for start, end in track(zip(boundaries[:-1], boundaries[1:]), total=len(boundaries) - 1):
         file.seek(start)
         chunk = file.read(end - start).decode("utf-8", errors="ignore")
         special_tokens_pat = "|".join([re.escape(i) for i in special_tokens])
-        partitions = re.split(special_tokens_pat, chunk)
-        for partition in partitions:
-            chunk_pretokens = re.findall(PRETOKENIZE_PAT, partition)
-            chunk_pretoken_counts = Counter(chunk_pretokens)
-            counter += chunk_pretoken_counts
+        mini_chunks.extend(re.split(special_tokens_pat, chunk))
+
+    batch_list = [mini_chunks[i : i + PRETOKENIZE_BATCHSIZE] for i in range(0, len(mini_chunks), PRETOKENIZE_BATCHSIZE)]
+    counter = Counter[str]()
+    print(f"split {len(mini_chunks)} mini chunks")
+    with Pool(processes=17) as pool:
+        for result in track(
+            pool.imap(_process_mini_chunk, batch_list, chunksize=5),
+            description="Processing mini chunks...",
+            total=len(batch_list),
+        ):
+            counter += result
 
     pretokens: list[Pretoken] = []
     for k, v in counter.items():
@@ -227,7 +250,7 @@ def _merge(
     pair = heap.pop()
     merged_token = pair.left + pair.right
 
-    print(f"[merge] {pair.left} + {pair.right} -> {merged_token}")
+    # print(f"[merge] {pair.left} + {pair.right} -> {merged_token}")
     merge.append((pair.left, pair.right))
 
     for occ_pretok in pair.occurrences:
@@ -251,7 +274,7 @@ def _merge_pretoken(
     @param pretok: 要合并的对所在的pretoken
     @param pos: 这一对当中的第一个元素在pretok内的索引
     """
-    print(f"_merge_pretoken({pretok.tokens})")
+    # print(f"_merge_pretoken({pretok.tokens})")
     old_tokens = pretok.tokens
     merged_token = old_tokens[pos] + old_tokens[pos + 1]
     new_tokens = old_tokens[:pos] + (old_tokens[pos] + old_tokens[pos + 1],) + old_tokens[pos + 2 :]
