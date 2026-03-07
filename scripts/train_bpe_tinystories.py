@@ -1,5 +1,5 @@
 import pathlib
-import pickle
+import json
 from cs336_basics.bpe import train_bpe
 import time
 from datetime import timedelta
@@ -21,13 +21,18 @@ duration = end_time - start_time
 print(f"Training complete. Elapsed time: {duration:.2f} seconds")
 print(f"Time formatted: {str(timedelta(seconds=int(duration)))}")
 
-save_path = DATA_PATH / "data" / "bpe_model.pt"
-checkpoint = {
-    "vocab": vocab,
-    "merges": merges,
-}
+save_path = DATA_PATH / "data"
+vocab_path = save_path / "tinystories_vocab.json"
+merges_path = save_path / "tinystories_merges.txt"
 
-with open(save_path, "wb") as f:
-    pickle.dump(checkpoint, f)
+with open(vocab_path, "w") as f:
+    int_to_str = {}
+    for k, v in vocab.items():
+        int_to_str[v.decode()] = k
+    json.dump(vocab, f)
+
+with open(merges_path, "w") as f:
+    for merge in merges:
+        f.write(f"{merge[0]} {merge[1]}\n")
 
 print(f"BPE saved to {save_path}")

@@ -1,13 +1,11 @@
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
-from functools import partial
+from multiprocessing import Pool
 import os
 import typing
 import regex as re
 from collections import Counter
 from rich.progress import track
-from multiprocessing import Process, Lock, Pool
-from multiprocessing.synchronize import Lock as LockType
-
 from cs336_basics.pretokenization_example import find_chunk_boundaries
 
 """
@@ -15,8 +13,8 @@ The Byte Pair Encoding (BPE) algorithm.
 """
 
 PRETOKENIZE_PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
-PRETOKENIZE_BATCHSIZE = 1000
-pretokenize_lock = Lock()
+CHUNKS = 1024
+NUM_PROCESSES = 12
 
 
 @dataclass
@@ -24,13 +22,16 @@ class Pretoken:
     tokens: tuple[bytes, ...]
     count: int
 
+    def __hash__(self):
+        return hash(self.tokens)
+
 
 @dataclass
 class AdjacentPair:
     left: bytes
     right: bytes
     count: int
-    occurrences: list[Pretoken]
+    occurrences: set[Pretoken]
 
     def __lt__(self, other):
         # Note: Maximum heap
@@ -61,7 +62,6 @@ class PairHeap:
         if not self.hp:
             raise IndexError("pop from empty heap")
         top = self.hp[0]
-        # print(f"[pop] {top.get_tuple()}")
         last = self.hp.pop()
         del self.index_map[top.get_tuple()]
         if self.hp:
@@ -74,7 +74,6 @@ class PairHeap:
         return self.hp[0]
 
     def remove(self, x: AdjacentPair) -> None:
-        # print(f"[remove] {x.get_tuple()}")
         if x.get_tuple() not in self.index_map:
             return
         idx = self.index_map[x.get_tuple()]
@@ -139,18 +138,19 @@ def train_bpe(
     special_tokens: list[str],
 ) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
     vocab = _init_vocab(special_tokens)
-    merges: list[tuple[bytes, bytes]] = []
+    merges = []
 
     with _load_file(input_path) as file:
         adj, heap = _pretokenize(file, special_tokens)
 
-    while len(vocab) < vocab_size:
+    total_steps = vocab_size - len(vocab)
+
+    for _ in track(range(total_steps), description="Training BPE"):
         _merge(vocab, adj, heap, merges)
 
-    print("====================== Vocab ======================")
     print(vocab)
 
-    return (vocab, merges)
+    return vocab, merges
 
 
 def _load_file(path: str | os.PathLike):
@@ -160,40 +160,35 @@ def _load_file(path: str | os.PathLike):
     return open(path, "rb")
 
 
-def _process_mini_chunk(mini_chunks: list[str]):
-    counter = Counter()
-    for mini_chunk in mini_chunks:
-        chunk_pretokens = re.findall(PRETOKENIZE_PAT, mini_chunk)
-        chunk_pretoken_counts = Counter(chunk_pretokens)
-        counter += chunk_pretoken_counts
-    return counter
+def process_chunk(file_path, start, end, special_tokens):
+    local_counter = Counter()
+    special_tokens_pat = "|".join([re.escape(i) for i in special_tokens])
+
+    with open(file_path, "rb") as f:
+        f.seek(start)
+        chunk = f.read(end - start).decode("utf-8", errors="ignore")
+        partitions = re.split(special_tokens_pat, chunk)
+        del chunk
+        for partition in partitions:
+            for match in re.finditer(PRETOKENIZE_PAT, partition):
+                local_counter[match.group()] += 1
+
+    return local_counter
 
 
 def _pretokenize(
     file: typing.BinaryIO, special_tokens: list[str]
 ) -> tuple[dict[tuple[bytes, bytes], AdjacentPair], PairHeap]:
-    num_processes = 16
-    print("begin find_chunk_boundaries")
-    boundaries = find_chunk_boundaries(file, num_processes, b"<|endoftext|>")
-    print(f"{len(boundaries)} boundaries found")
+    boundaries = find_chunk_boundaries(file, CHUNKS, b"<|endoftext|>")
 
-    mini_chunks: list[str] = []
-    for start, end in track(zip(boundaries[:-1], boundaries[1:]), total=len(boundaries) - 1):
-        file.seek(start)
-        chunk = file.read(end - start).decode("utf-8", errors="ignore")
-        special_tokens_pat = "|".join([re.escape(i) for i in special_tokens])
-        mini_chunks.extend(re.split(special_tokens_pat, chunk))
-
-    batch_list = [mini_chunks[i : i + PRETOKENIZE_BATCHSIZE] for i in range(0, len(mini_chunks), PRETOKENIZE_BATCHSIZE)]
     counter = Counter[str]()
-    print(f"split {len(mini_chunks)} mini chunks")
-    with Pool(processes=17) as pool:
-        for result in track(
-            pool.imap(_process_mini_chunk, batch_list, chunksize=5),
-            description="Processing mini chunks...",
-            total=len(batch_list),
-        ):
-            counter += result
+    tasks = [(file.name, start, end, special_tokens) for start, end in zip(boundaries[:-1], boundaries[1:])]
+
+    with Pool(processes=NUM_PROCESSES) as pool:
+        results = pool.starmap(process_chunk, tasks)
+
+        for local_counter in results:
+            counter += local_counter
 
     pretokens: list[Pretoken] = []
     for k, v in counter.items():
@@ -208,9 +203,9 @@ def _pretokenize(
             if adj_tuple in pairs:
                 pair = pairs[adj_tuple]
             else:
-                pair = pairs[adj_tuple] = AdjacentPair(k.tokens[i], k.tokens[i + 1], 0, [])
+                pair = pairs[adj_tuple] = AdjacentPair(k.tokens[i], k.tokens[i + 1], 0, set())
             pair.count += k.count
-            pair.occurrences.append(k)
+            pair.occurrences.add(k)
 
     heap = PairHeap()
     for k, v in pairs.items():
@@ -250,7 +245,6 @@ def _merge(
     pair = heap.pop()
     merged_token = pair.left + pair.right
 
-    # print(f"[merge] {pair.left} + {pair.right} -> {merged_token}")
     merge.append((pair.left, pair.right))
 
     for occ_pretok in pair.occurrences:
@@ -274,7 +268,6 @@ def _merge_pretoken(
     @param pretok: 要合并的对所在的pretoken
     @param pos: 这一对当中的第一个元素在pretok内的索引
     """
-    # print(f"_merge_pretoken({pretok.tokens})")
     old_tokens = pretok.tokens
     merged_token = old_tokens[pos] + old_tokens[pos + 1]
     new_tokens = old_tokens[:pos] + (old_tokens[pos] + old_tokens[pos + 1],) + old_tokens[pos + 2 :]
@@ -318,9 +311,9 @@ def _push_pair(
         pair = adj[pair_tuple]
         newcount = pair.count + pretoken.count
         if pretoken not in pair.occurrences:
-            pair.occurrences.append(pretoken)
+            pair.occurrences.add(pretoken)
         heap.update_count(pair, newcount)
     else:
-        pair = adj[pair_tuple] = AdjacentPair(pair_tuple[0], pair_tuple[1], pretoken.count, [pretoken])
+        pair = adj[pair_tuple] = AdjacentPair(pair_tuple[0], pair_tuple[1], pretoken.count, set([pretoken]))
         adj[pair_tuple] = pair
         heap.push(pair)
