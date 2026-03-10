@@ -1,4 +1,3 @@
-from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from multiprocessing import Pool
 import os
@@ -6,13 +5,12 @@ import typing
 import regex as re
 from collections import Counter
 from rich.progress import track
-from cs336_basics.pretokenization_example import find_chunk_boundaries
+from cs336_basics.pretokenization import find_chunk_boundaries, PRETOKENIZE_PAT
 
 """
 The Byte Pair Encoding (BPE) algorithm.
 """
 
-PRETOKENIZE_PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 CHUNKS = 1024
 NUM_PROCESSES = 12
 
