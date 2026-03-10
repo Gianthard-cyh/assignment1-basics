@@ -5,7 +5,7 @@ import typing
 import regex as re
 from collections import Counter
 from rich.progress import track
-from cs336_basics.pretokenization import find_chunk_boundaries, PRETOKENIZE_PAT
+from .pretokenization import find_chunk_boundaries, PRETOKENIZE_PAT
 
 """
 The Byte Pair Encoding (BPE) algorithm.

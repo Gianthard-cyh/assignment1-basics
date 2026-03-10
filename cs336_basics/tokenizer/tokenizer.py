@@ -4,8 +4,8 @@ import regex as re
 import typing
 from concurrent.futures import ProcessPoolExecutor
 
-from cs336_basics.bpe import CHUNKS
-from cs336_basics.pretokenization import find_chunk_boundaries, PRETOKENIZE_PAT
+from .bpe import CHUNKS
+from .pretokenization import find_chunk_boundaries, PRETOKENIZE_PAT
 
 
 @dataclass
