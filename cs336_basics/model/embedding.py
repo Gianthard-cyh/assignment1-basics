@@ -15,7 +15,8 @@ class Embedding(nn.Module):
             dtype (torch.dtype | None): 参数的数据类型
         """
         super().__init__()
-        self.W = nn.Parameter(torch.empty(num_embeddings, embedding_dim))
+        self.vocab = nn.Parameter(torch.empty(num_embeddings, embedding_dim))
+        torch.nn.init.trunc_normal_(self.vocab)
 
     def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
         """
@@ -27,4 +28,4 @@ class Embedding(nn.Module):
         返回:
             torch.Tensor: 查表得到的嵌入张量，形状为 (*token_ids.shape, embedding_dim)
         """
-        return self.W[token_ids]
+        return self.vocab[token_ids]
