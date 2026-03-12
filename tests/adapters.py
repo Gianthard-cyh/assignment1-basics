@@ -10,6 +10,7 @@ from jaxtyping import Bool, Float, Int
 from torch import Tensor
 from torch import nn
 
+from cs336_basics.model.attention import Attention
 from cs336_basics.model.rmsnorm import RMSNorm
 from cs336_basics.model.rope import RoPE
 from cs336_basics.model.silu import SiLU
@@ -122,7 +123,8 @@ def run_scaled_dot_product_attention(
     Returns:
         Float[Tensor, " ... queries d_v"]: Output of SDPA
     """
-    raise NotImplementedError
+    attn = Attention()
+    return attn(Q, K, V, mask)
 
 
 def run_multihead_self_attention(
@@ -454,7 +456,7 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
         softmax normalizing the specified `dim`.
     """
     softmax = Softmax()
-    return softmax(in_features,dim)
+    return softmax(in_features, dim)
 
 
 def run_cross_entropy(
