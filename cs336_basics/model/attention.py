@@ -1,5 +1,4 @@
 from einops import einsum
-import torch
 import torch.nn as nn
 from torch import Tensor, inf
 from jaxtyping import Float, Bool
@@ -21,7 +20,7 @@ class Attention(nn.Module):
         V: Float[Tensor, "... values d_v"],
         mask: Bool[Tensor, "... queries keys"] | None = None,
     ) -> Float[Tensor, "... queries d_v"]:
-        score = einsum(Q, K, "... q d, ... k d -> q k") / (Q.size(-1) ** 0.5)
+        score = einsum(Q, K, "... q d, ... k d -> ... q k") / (Q.size(-1) ** 0.5)
         if mask is not None:
             score = score.masked_fill(mask == False, -inf)
         attn = self.softmax(score, -1)

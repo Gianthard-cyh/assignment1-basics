@@ -11,6 +11,7 @@ from torch import Tensor
 from torch import nn
 
 from cs336_basics.model.attention import Attention
+from cs336_basics.model.mha import MHA
 from cs336_basics.model.rmsnorm import RMSNorm
 from cs336_basics.model.rope import RoPE
 from cs336_basics.model.silu import SiLU
@@ -158,7 +159,12 @@ def run_multihead_self_attention(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    mha = MHA(d_model=d_model, num_heads=num_heads)
+    mha.q_proj.data = q_proj_weight
+    mha.k_proj.data = k_proj_weight
+    mha.v_proj.data = v_proj_weight
+    mha.o_proj.data = o_proj_weight
+    return mha(in_features)
 
 
 def run_multihead_self_attention_with_rope(
@@ -198,7 +204,13 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    rope_module = RoPE(theta=theta, d_k=d_model // num_heads, max_seq_len=max_seq_len)
+    mha = MHA(d_model=d_model, num_heads=num_heads, rope=rope_module)
+    mha.q_proj.data = q_proj_weight
+    mha.k_proj.data = k_proj_weight
+    mha.v_proj.data = v_proj_weight
+    mha.o_proj.data = o_proj_weight
+    return mha(in_features, token_positions)
 
 
 def run_rope(
