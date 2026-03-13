@@ -1,11 +1,9 @@
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 import regex as re
-import typing
 from concurrent.futures import ProcessPoolExecutor
 
-from .bpe import CHUNKS
-from .pretokenization import find_chunk_boundaries, PRETOKENIZE_PAT
+from .pretokenization import PRETOKENIZE_PAT
 
 
 @dataclass

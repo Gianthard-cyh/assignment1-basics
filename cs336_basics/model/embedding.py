@@ -1,4 +1,3 @@
-from einops import einsum
 import torch
 import torch.nn as nn
 

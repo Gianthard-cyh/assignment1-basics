@@ -32,4 +32,4 @@ class Linear(nn.Module):
         返回:
             torch.Tensor: 变换后的张量
         """
-        return einsum(x, self.W,"... i, i o -> ... o")
+        return einsum(x, self.W, "... i, i o -> ... o")

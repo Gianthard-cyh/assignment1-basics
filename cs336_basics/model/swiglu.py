@@ -1,8 +1,6 @@
-from sympy import Float
 import torch
-from torch import nn, Tensor
+from torch import nn
 from .silu import SiLU
-from jaxtyping import Float
 
 
 class SwiGLU(nn.Module):
