@@ -17,7 +17,7 @@ from cs336_basics.model.rope import RoPE
 from cs336_basics.model.silu import SiLU
 from cs336_basics.model.softmax import Softmax
 from cs336_basics.model.swiglu import SwiGLU
-from cs336_basics.model.transformer import TransformerBlock
+from cs336_basics.model.transformer import TransformerBlock, TransformerLM
 from cs336_basics.tokenizer.bpe import train_bpe
 from cs336_basics.tokenizer.tokenizer import Tokenizer
 from cs336_basics.model.linear import Linear
@@ -46,7 +46,7 @@ def run_linear(
         d_in,
         d_out,
     )
-    linear.W = nn.Parameter(weights.T)
+    linear.weight.data = weights
     return linear(in_features)
 
 
@@ -70,7 +70,7 @@ def run_embedding(
     """
 
     emb = Embedding(vocab_size, d_model)
-    emb.vocab = nn.Parameter(weights)
+    emb.weight = nn.Parameter(weights)
     return emb(token_ids)
 
 
@@ -101,9 +101,9 @@ def run_swiglu(
     # swiglu.load_state_dict(weights)
     # You can also manually assign the weights
     swiglu = SwiGLU(d_model=d_model, d_ff=d_ff)
-    swiglu.w1.data = w1_weight
-    swiglu.w2.data = w2_weight
-    swiglu.w3.data = w3_weight
+    swiglu.w1.weight.data = w1_weight
+    swiglu.w2.weight.data = w2_weight
+    swiglu.w3.weight.data = w3_weight
     return swiglu(in_features)
 
 
@@ -161,10 +161,10 @@ def run_multihead_self_attention(
         implementation with the given QKV projection weights and input features.
     """
     mha = MHA(d_model=d_model, num_heads=num_heads)
-    mha.q_proj.data = q_proj_weight
-    mha.k_proj.data = k_proj_weight
-    mha.v_proj.data = v_proj_weight
-    mha.o_proj.data = o_proj_weight
+    mha.q_proj.weight.data = q_proj_weight
+    mha.k_proj.weight.data = k_proj_weight
+    mha.v_proj.weight.data = v_proj_weight
+    mha.output_proj.weight.data = o_proj_weight
     return mha(in_features)
 
 
@@ -207,10 +207,10 @@ def run_multihead_self_attention_with_rope(
     """
     rope_module = RoPE(theta=theta, d_k=d_model // num_heads, max_seq_len=max_seq_len)
     mha = MHA(d_model=d_model, num_heads=num_heads, rope=rope_module)
-    mha.q_proj.data = q_proj_weight
-    mha.k_proj.data = k_proj_weight
-    mha.v_proj.data = v_proj_weight
-    mha.o_proj.data = o_proj_weight
+    mha.q_proj.weight.data = q_proj_weight
+    mha.k_proj.weight.data = k_proj_weight
+    mha.v_proj.weight.data = v_proj_weight
+    mha.output_proj.weight.data = o_proj_weight
     return mha(in_features, token_positions)
 
 
@@ -307,30 +307,8 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    mapped_state = {}
-    replace_map = {
-        "ln1.weight": "ln1.gain",
-        "ln2.weight": "ln2.gain",
-        "attn.q_proj.weight": "attn.q_proj",
-        "attn.k_proj.weight": "attn.k_proj",
-        "attn.v_proj.weight": "attn.v_proj",
-        "attn.output_proj.weight": "attn.o_proj",
-        "ffn.w1.weight": "ffn.w1",
-        "ffn.w2.weight": "ffn.w2",
-        "ffn.w3.weight": "ffn.w3",
-    }
-
-    for old_key, value in weights.items():
-        new_key = old_key
-        for old_str, new_str in replace_map.items():
-            if old_str in new_key:
-                new_key = new_key.replace(old_str, new_str)
-                break
-
-        mapped_state[new_key] = value
-
     block = TransformerBlock(d_model=d_model, num_heads=num_heads, d_ff=d_ff, max_seq_len=max_seq_len, theta=theta)
-    block.load_state_dict(mapped_state)
+    block.load_state_dict(weights)
     return block(in_features)
 
 
@@ -413,7 +391,9 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    lm = TransformerLM(vocab_size, context_length, d_model, num_layers, num_heads, d_ff, rope_theta)
+    lm.load_state_dict(weights)
+    return lm(in_indices)
 
 
 def run_rmsnorm(
@@ -437,7 +417,7 @@ def run_rmsnorm(
         RMSNorm of the `in_features`.
     """
     rms_norm = RMSNorm(d_model, eps)
-    rms_norm.gain = nn.Parameter(weights)
+    rms_norm.weight = nn.Parameter(weights)
     return rms_norm(in_features)
 
 

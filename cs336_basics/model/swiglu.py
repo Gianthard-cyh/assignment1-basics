@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from .silu import SiLU
+from .linear import Linear
 
 
 class SwiGLU(nn.Module):
@@ -13,13 +14,13 @@ class SwiGLU(nn.Module):
         self.d_model = d_model
         self.d_ff = d_ff
 
-        self.w1 = nn.Parameter(torch.empty(d_ff, d_model))
-        self.w2 = nn.Parameter(torch.empty(d_model, d_ff))
-        self.w3 = nn.Parameter(torch.empty(d_ff, d_model))
+        self.w1 = Linear(d_model, d_ff)
+        self.w2 = Linear(d_ff, d_model)
+        self.w3 = Linear(d_model, d_ff)
 
-        torch.nn.init.trunc_normal_(self.w1)
-        torch.nn.init.trunc_normal_(self.w2)
-        torch.nn.init.trunc_normal_(self.w3)
+        torch.nn.init.trunc_normal_(self.w1.weight)
+        torch.nn.init.trunc_normal_(self.w2.weight)
+        torch.nn.init.trunc_normal_(self.w3.weight)
 
         self.silu = SiLU()
 
@@ -33,4 +34,4 @@ class SwiGLU(nn.Module):
         返回:
             torch.Tensor: 输出张量
         """
-        return (self.silu(x @ self.w1.T) * (x @ self.w3.T)) @ self.w2.T
+        return self.w2(self.silu(self.w1(x)) * (self.w3(x)))

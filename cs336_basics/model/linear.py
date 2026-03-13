@@ -19,8 +19,8 @@ class Linear(nn.Module):
             dtype (torch.dtype | None): 参数的数据类型
         """
         super().__init__()
-        self.W = nn.Parameter(torch.empty(in_features, out_features, device=device, dtype=dtype))
-        torch.nn.init.trunc_normal_(self.W)
+        self.weight = nn.Parameter(torch.empty(out_features, in_features, device=device, dtype=dtype))
+        torch.nn.init.trunc_normal_(self.weight)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -32,4 +32,4 @@ class Linear(nn.Module):
         返回:
             torch.Tensor: 变换后的张量
         """
-        return einsum(x, self.W, "... i, i o -> ... o")
+        return einsum(x, self.weight, "... i, o i -> ... o")

@@ -14,7 +14,7 @@ class RMSNorm(nn.Module):
             dtype (torch.dtype | None): 参数的数据类型
         """
         super().__init__()
-        self.gain = nn.Parameter(torch.empty(d_model, device=device, dtype=dtype))
+        self.weight = nn.Parameter(torch.empty(d_model, device=device, dtype=dtype))
         self.d_model = d_model
         self.eps = eps
         self.dtype = dtype
@@ -32,5 +32,5 @@ class RMSNorm(nn.Module):
         in_dtype = x.dtype
         x = x.to(torch.float32)
         sq_sum = x.pow(2).mean(-1, keepdim=True)
-        norm_x = x / torch.sqrt(sq_sum + self.eps) * self.gain
+        norm_x = x / torch.sqrt(sq_sum + self.eps) * self.weight
         return norm_x.to(in_dtype)
