@@ -44,6 +44,5 @@ class RoPE(nn.Module):
         """
         x_pairs = x.view(*x.shape[:-1], -1, 2)
         r = self.r[token_positions]
-        # 转置
         sum = einsum(x_pairs, r, "... s d v, ... s d v2 v -> ... s d v2")
         return sum.reshape(*x.shape)

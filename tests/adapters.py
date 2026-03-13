@@ -17,6 +17,7 @@ from cs336_basics.model.rope import RoPE
 from cs336_basics.model.silu import SiLU
 from cs336_basics.model.softmax import Softmax
 from cs336_basics.model.swiglu import SwiGLU
+from cs336_basics.model.transformer import TransformerBlock
 from cs336_basics.tokenizer.bpe import train_bpe
 from cs336_basics.tokenizer.tokenizer import Tokenizer
 from cs336_basics.model.linear import Linear
@@ -100,9 +101,9 @@ def run_swiglu(
     # swiglu.load_state_dict(weights)
     # You can also manually assign the weights
     swiglu = SwiGLU(d_model=d_model, d_ff=d_ff)
-    swiglu.W_up.data = w1_weight.T
-    swiglu.W_down.data = w2_weight.T
-    swiglu.W_gate.data = w3_weight.T
+    swiglu.w1.data = w1_weight
+    swiglu.w2.data = w2_weight
+    swiglu.w3.data = w3_weight
     return swiglu(in_features)
 
 
@@ -306,7 +307,31 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
+    mapped_state = {}
+    replace_map = {
+        "ln1.weight": "ln1.gain",
+        "ln2.weight": "ln2.gain",
+        "attn.q_proj.weight": "attn.q_proj",
+        "attn.k_proj.weight": "attn.k_proj",
+        "attn.v_proj.weight": "attn.v_proj",
+        "attn.output_proj.weight": "attn.o_proj",
+        "ffn.w1.weight": "ffn.w1",
+        "ffn.w2.weight": "ffn.w2",
+        "ffn.w3.weight": "ffn.w3",
+    }
+
+    for old_key, value in weights.items():
+        new_key = old_key
+        for old_str, new_str in replace_map.items():
+            if old_str in new_key:
+                new_key = new_key.replace(old_str, new_str)
+                break
+
+        mapped_state[new_key] = value
+
+    block = TransformerBlock(d_model=d_model, num_heads=num_heads, d_ff=d_ff, max_seq_len=max_seq_len, theta=theta)
+    block.load_state_dict(mapped_state)
+    return block(in_features)
 
 
 def run_transformer_lm(

@@ -14,7 +14,7 @@ class RMSNorm(nn.Module):
             dtype (torch.dtype | None): 参数的数据类型
         """
         super().__init__()
-        self.gain = nn.Parameter(torch.empty(0, device=device, dtype=dtype))
+        self.gain = nn.Parameter(torch.empty(d_model, device=device, dtype=dtype))
         self.d_model = d_model
         self.eps = eps
         self.dtype = dtype

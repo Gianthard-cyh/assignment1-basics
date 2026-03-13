@@ -15,13 +15,13 @@ class SwiGLU(nn.Module):
         self.d_model = d_model
         self.d_ff = d_ff
 
-        self.W_up = nn.Parameter(torch.empty(d_model, d_ff))
-        self.W_gate = nn.Parameter(torch.empty(d_model, d_ff))
-        self.W_down = nn.Parameter(torch.empty(d_ff, d_model))
+        self.w1 = nn.Parameter(torch.empty(d_ff, d_model))
+        self.w2 = nn.Parameter(torch.empty(d_model, d_ff))
+        self.w3 = nn.Parameter(torch.empty(d_ff, d_model))
 
-        torch.nn.init.trunc_normal_(self.W_up)
-        torch.nn.init.trunc_normal_(self.W_gate)
-        torch.nn.init.trunc_normal_(self.W_down)
+        torch.nn.init.trunc_normal_(self.w1)
+        torch.nn.init.trunc_normal_(self.w2)
+        torch.nn.init.trunc_normal_(self.w3)
 
         self.silu = SiLU()
 
@@ -35,4 +35,4 @@ class SwiGLU(nn.Module):
         返回:
             torch.Tensor: 输出张量
         """
-        return (self.silu(x @ self.W_up) * (x @ self.W_gate)) @ self.W_down
+        return (self.silu(x @ self.w1.T) * (x @ self.w3.T)) @ self.w2.T
