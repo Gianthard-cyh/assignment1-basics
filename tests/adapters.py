@@ -22,7 +22,10 @@ from cs336_basics.tokenizer.bpe import train_bpe
 from cs336_basics.tokenizer.tokenizer import Tokenizer
 from cs336_basics.model.linear import Linear
 from cs336_basics.model.embedding import Embedding
+from cs336_basics.train.adam import AdamW
 from cs336_basics.train.cross_entropy import cross_entropy
+from cs336_basics.train.gradient_clipping import clip_gradient
+from cs336_basics.train.lr_schedule import cosine_lr_schedule
 
 
 def run_linear(
@@ -504,14 +507,14 @@ def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm:
 
     The gradients of the parameters (parameter.grad) should be modified in-place.
     """
-    raise NotImplementedError
+    return clip_gradient(parameters, max_l2_norm)
 
 
 def get_adamw_cls() -> Any:
     """
     Returns a torch.optim.Optimizer that implements AdamW.
     """
-    raise NotImplementedError
+    return AdamW
 
 
 def run_get_lr_cosine_schedule(
@@ -539,7 +542,7 @@ def run_get_lr_cosine_schedule(
     Returns:
         Learning rate at the given iteration under the specified schedule.
     """
-    raise NotImplementedError
+    return cosine_lr_schedule(it, max_learning_rate, min_learning_rate, warmup_iters, cosine_cycle_iters)
 
 
 def run_save_checkpoint(
