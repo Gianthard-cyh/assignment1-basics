@@ -40,6 +40,7 @@ class Tokenizer:
         self.bytes_id_dict = {v: k for k, v in self.vocab.items()}
         self.merges = merges
         self.special_tokens = None
+        self.bpe_ranks = {merge: i for i, merge in enumerate(self.merges)}
         if special_tokens:
             self.special_tokens = sorted(special_tokens, key=len, reverse=True)
         self.pretokenize_regex = re.compile(PRETOKENIZE_PAT)
@@ -72,17 +73,10 @@ class Tokenizer:
         """
         chunks = self._pretokenize(text)
 
-        task_indices = [i for i, chunk in enumerate(chunks) if isinstance(chunk, PretokenizedTextChunk)]
-
-        with ProcessPoolExecutor(max_workers=10) as executor:
-            parallel_results = list(executor.map(self._process_chunk, [chunks[i] for i in task_indices]))
-
         res: list[int] = []
-        parallel_map = dict(zip(task_indices, parallel_results))
-
-        for i, chunk in enumerate(chunks):
+        for chunk in chunks:
             if isinstance(chunk, PretokenizedTextChunk):
-                res.extend(parallel_map[i])
+                res.extend(self._process_chunk(chunk))
             elif isinstance(chunk, SpecialTokenChunk):
                 res.append(chunk.token_id)
 
@@ -143,16 +137,25 @@ class Tokenizer:
 
         return chunks
 
-    def _merge(self, pretokens: list[list[bytes]]):
+    def _merge(self, pretokens: list[list[bytes]]) -> list[list[bytes]]:
         for pretoken in pretokens:
-            for merge in self.merges:
-                i = 1
-                while i < len(pretoken):
-                    if pretoken[i - 1] == merge[0] and pretoken[i] == merge[1]:
-                        pretoken.pop(i)
-                        pretoken[i - 1] = merge[0] + merge[1]
-                    else:
-                        i += 1
+            while len(pretoken) > 1:
+                min_rank = float("inf")
+                best_idx = -1
+
+                for i in range(len(pretoken) - 1):
+                    pair = (pretoken[i], pretoken[i + 1])
+                    rank = self.bpe_ranks.get(pair, float("inf"))
+                    if rank < min_rank:
+                        min_rank = rank
+                        best_idx = i
+
+                if best_idx == -1:
+                    break
+
+                pretoken[best_idx] = pretoken[best_idx] + pretoken[best_idx + 1]
+                pretoken.pop(best_idx + 1)
+
         return pretokens
 
     def _pretoken_to_ids(self, pretoken: list[bytes]):
