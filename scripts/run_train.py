@@ -9,7 +9,7 @@ from rich.progress import (
     MofNCompleteColumn,
     TaskProgressColumn,
 )
-from torch.profiler import profile, record_function, ProfilerActivity, tensorboard_trace_handler
+from torch.profiler import profile, record_function, ProfilerActivity
 from rich.live import Live
 from rich.table import Table
 from rich.console import Console
@@ -33,13 +33,13 @@ def run_training():
     )
 
     trainer_cfg = TrainerConfig(
-        lr=1e-3,
+        lr=1e-4,
         weight_decay=0.01,
         beta1=0.9,
         beta2=0.95,
         max_samples=320000000,
-        train_batch_size=16,
-        val_batch_size=8,
+        train_batch_size=512,
+        val_batch_size=16,
         context_length=256,
         device="cuda" if torch.cuda.is_available() else "cpu",
     )

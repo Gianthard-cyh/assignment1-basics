@@ -92,12 +92,11 @@ class LMTrainer:
         loss.backward()
         total_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=float("inf"))
         clip_gradient(self.model.parameters(), 1.0)
-        clipped_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=float("inf"))
         self.optimizer.step()
         self.cur_step += 1
         val_loss = self.test().item()
         swanlab.log(
-            {"grad_norm": total_norm, "clipped_norm": clipped_norm, "train_loss": loss.item(), "val_loss": val_loss, "lr": lr}
+            {"grad_norm": total_norm, "train_loss": loss.item(), "val_loss": val_loss, "lr": lr}
         )
         return val_loss
 
@@ -113,5 +112,5 @@ class LMTrainer:
             loss = cross_entropy(logits, labels)
             return loss
 
-    def finish():
+    def finish(self):
         swanlab.finish()
