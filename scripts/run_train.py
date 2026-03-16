@@ -22,7 +22,7 @@ def run_training():
     console = Console()
 
     model_cfg = ModelConfig(
-        vocab_size=10240,
+        vocab_size=10000,
         context_length=256,
         d_model=512,
         num_layers=4,
@@ -38,8 +38,8 @@ def run_training():
         beta1=0.9,
         beta2=0.95,
         max_samples=320000000,
-        train_batch_size=24,
-        val_batch_size=12,
+        train_batch_size=512,
+        val_batch_size=16,
         context_length=256,
         device="cuda" if torch.cuda.is_available() else "cpu",
     )
