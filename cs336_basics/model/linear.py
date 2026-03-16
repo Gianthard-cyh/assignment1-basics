@@ -5,6 +5,7 @@ Linear Module
 from einops import einsum
 import torch
 import torch.nn as nn
+import math
 
 
 class Linear(nn.Module):
@@ -20,7 +21,9 @@ class Linear(nn.Module):
         """
         super().__init__()
         self.weight = nn.Parameter(torch.empty(out_features, in_features, device=device, dtype=dtype))
-        torch.nn.init.trunc_normal_(self.weight)
+
+        sigma = math.sqrt(2.0 / (in_features + out_features))
+        nn.init.trunc_normal_(self.weight, std=sigma, a=-3 * sigma, b=3 * sigma)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

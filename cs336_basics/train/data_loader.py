@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 
+
 def get_batch(x, batch_size, context_length, device):
     n = len(x)
 

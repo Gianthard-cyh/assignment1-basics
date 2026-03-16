@@ -67,7 +67,7 @@ class LMTrainer:
         self.train_dataset = np.load(self.train_dataset_path, mmap_mode="r")
         self.val_dataset = np.load(self.val_dataset_path, mmap_mode="r")
         print(f"- Train dataset: {len(self.train_dataset)} tokens")
-        self.total_steps = int(math.ceil(self.trainer_config.max_samples / self.trainer_config.train_batch_size))
+        self.total_steps = int(math.ceil(self.trainer_config.max_samples / self.trainer_config.train_batch_size / self.trainer_config.context_length)) # 竟然旺季处context_length了！
         self.cur_step = 1
         print(f"- total_steps: {self.total_steps}")
         for p in self.model.named_parameters():
@@ -83,7 +83,7 @@ class LMTrainer:
             self.trainer_config.context_length,
             self.trainer_config.device,
         )
-        lr = cosine_lr_schedule(self.cur_step, self.trainer_config.lr, 0.0, 100, self.total_steps)
+        lr = cosine_lr_schedule(self.cur_step, self.trainer_config.lr, 0.0, 1 / 10 * self.total_steps, self.total_steps)
         for param_group in self.optimizer.param_groups:
             param_group["lr"] = lr
         logits = self.model(input_ids)

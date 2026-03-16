@@ -14,8 +14,7 @@ class RMSNorm(nn.Module):
             dtype (torch.dtype | None): 参数的数据类型
         """
         super().__init__()
-        self.weight = nn.Parameter(torch.empty(d_model, device=device, dtype=dtype))
-        torch.nn.init.zeros_(self.weight)
+        self.weight = nn.Parameter(torch.ones(d_model, device=device, dtype=dtype))
         self.d_model = d_model
         self.eps = eps
         self.dtype = dtype
