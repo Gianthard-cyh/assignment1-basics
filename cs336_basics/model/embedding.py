@@ -14,7 +14,7 @@ class Embedding(nn.Module):
             dtype (torch.dtype | None): 参数的数据类型
         """
         super().__init__()
-        self.weight = nn.Parameter(torch.empty(num_embeddings, embedding_dim))
+        self.weight = nn.Parameter(torch.empty(num_embeddings, embedding_dim, device=device))
         torch.nn.init.trunc_normal_(self.weight)
 
     def forward(self, token_ids: torch.Tensor) -> torch.Tensor:

@@ -14,22 +14,18 @@ class MHA(nn.Module):
     Multi Head Self-Attention Module
     """
 
-    def __init__(self, d_model: int, num_heads: int, rope: RoPE | None = None):
+    def __init__(self, d_model: int, num_heads: int, rope: RoPE | None = None, device=None):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
-        self.q_proj = Linear(d_model, d_model)
-        self.k_proj = Linear(d_model, d_model)
-        self.v_proj = Linear(d_model, d_model)
-        self.output_proj = Linear(d_model, d_model)
-
-        torch.nn.init.trunc_normal_(self.q_proj.weight)
-        torch.nn.init.trunc_normal_(self.k_proj.weight)
-        torch.nn.init.trunc_normal_(self.v_proj.weight)
-        torch.nn.init.trunc_normal_(self.output_proj.weight)
+        self.q_proj = Linear(d_model, d_model, device)
+        self.k_proj = Linear(d_model, d_model, device)
+        self.v_proj = Linear(d_model, d_model, device)
+        self.output_proj = Linear(d_model, d_model, device)
 
         self.attn = Attention()
         self.rope = rope
+        self.device = device
 
     def forward(
         self,
@@ -37,7 +33,7 @@ class MHA(nn.Module):
         token_positions: Int[Tensor, " ... sequence_length"] | None = None,
     ) -> Float[Tensor, " ... sequence_length d_out"]:
         s_len = x.size(-2)
-        mask = torch.tril(torch.ones(s_len, s_len))
+        mask = torch.tril(torch.ones(s_len, s_len,device=self.device))
 
         Q = self.q_proj(x)
         K = self.k_proj(x)

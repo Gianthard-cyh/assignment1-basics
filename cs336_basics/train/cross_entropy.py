@@ -10,8 +10,11 @@ def log_softmax(inputs: Float[Tensor, "..."], dim: int):
 
 
 def cross_entropy(inputs: Float[Tensor, " batch_size vocab_size"], targets: Int[Tensor, " batch_size"]):
-    log_probs = log_softmax(inputs, -1)
-    batch_idx = torch.arange(targets.shape[0])
-    target_log_probs = log_probs[batch_idx, targets]
+    logits_flat = inputs.view(-1, inputs.size(-1))
+    targets_flat = targets.view(-1).long()
+    
+    log_probs = log_softmax(logits_flat, -1)
+    batch_idx = torch.arange(targets_flat.shape[0], device=inputs.device)
+    target_log_probs = log_probs[batch_idx, targets_flat]
     
     return -target_log_probs.mean()

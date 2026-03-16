@@ -15,6 +15,7 @@ class RMSNorm(nn.Module):
         """
         super().__init__()
         self.weight = nn.Parameter(torch.empty(d_model, device=device, dtype=dtype))
+        torch.nn.init.ones_(self.weight)
         self.d_model = d_model
         self.eps = eps
         self.dtype = dtype

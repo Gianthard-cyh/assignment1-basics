@@ -18,7 +18,7 @@ class RoPE(nn.Module):
         """
         super().__init__()
         assert d_k % 2 == 0
-        self.freq = 1 / (torch.tensor([theta]) ** (torch.arange(0, d_k, 2).float() / d_k))
+        self.freq = 1 / (torch.tensor([theta],device=device) ** (torch.arange(0, d_k, 2, device=device).float() / d_k))
 
         r_list = []
         for i in range(max_seq_len):
@@ -29,7 +29,7 @@ class RoPE(nn.Module):
                     [[torch.cos(cur_theta), -torch.sin(cur_theta)], [torch.sin(cur_theta), torch.cos(cur_theta)]]
                 )
             r_list.append(pos)
-        self.register_buffer("r", torch.tensor(r_list), persistent=False)
+        self.register_buffer("r", torch.tensor(r_list, device=device), persistent=False)
 
     def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
         """
