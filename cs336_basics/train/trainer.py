@@ -64,8 +64,8 @@ class LMTrainer:
         self.softmax = Softmax()
         self.train_dataset_path = train_dataset_path
         self.val_dataset_path = val_dataset_path
-        self.train_dataset = np.memmap(self.train_dataset_path, dtype="int16", mode="r")
-        self.val_dataset = np.memmap(self.val_dataset_path, dtype="int16", mode="r")
+        self.train_dataset = np.load(self.train_dataset_path, mmap_mode="r")
+        self.val_dataset = np.load(self.val_dataset_path, mmap_mode="r")
         print(f"- Train dataset: {len(self.train_dataset)} tokens")
         self.total_steps = int(math.ceil(self.trainer_config.max_samples / self.trainer_config.train_batch_size))
         self.cur_step = 1
@@ -76,7 +76,7 @@ class LMTrainer:
     def get_total_steps(self):
         return self.total_steps
 
-    def step(self):
+    def step(self, log: bool = False, test: bool = False):
         input_ids, labels = get_batch(
             self.train_dataset,
             self.trainer_config.train_batch_size,
@@ -94,10 +94,17 @@ class LMTrainer:
         clip_gradient(self.model.parameters(), 1.0)
         self.optimizer.step()
         self.cur_step += 1
-        val_loss = self.test().item()
-        swanlab.log(
-            {"grad_norm": total_norm, "train_loss": loss.item(), "val_loss": val_loss, "lr": lr}
-        )
+        val_loss = None
+        if test:
+            val_loss = self.test().item()
+        if log:
+            log_dict = {
+                "grad_norm": total_norm,
+                "train_loss": loss.item(),
+                "val_loss": val_loss,
+                "lr": lr,
+            }
+            swanlab.log({k: v for k, v in log_dict.items() if v is not None}, self.cur_step)
         return val_loss
 
     def test(self):

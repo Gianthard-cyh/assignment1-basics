@@ -21,6 +21,7 @@ dependencies = [
     "ty>=0.0.1a16",
     "rich>=14.3.3",
     "viztracer>=1.1.1",
+    "swanlab>=0.6.4",
 ]
 
 [build-system]

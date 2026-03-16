@@ -67,14 +67,12 @@ def run_training():
 
     with Live(progress, console=console, refresh_per_second=4):
         for step_idx in range(trainer.get_total_steps()):
-            val_loss = trainer.step()
+            trainer.step(log=step_idx % 10 == 0, test=step_idx % 500 == 0)
 
             progress.update(train_task, advance=1)
 
             if step_idx % 10 == 0:
-                loss_val = val_loss
-                color = "red" if loss_val > 20 else "green"
-                progress.update(train_task, description=f"[cyan]Step {step_idx} | Loss: [{color}]{loss_val:.4f}[/]")
+                progress.update(train_task, description=f"[cyan]Step {step_idx}[/]")
 
             if step_idx % 2000 == 0:
                 progress.console.print(f"[bold yellow][{step_idx}][/] Saving checkpoint...")
