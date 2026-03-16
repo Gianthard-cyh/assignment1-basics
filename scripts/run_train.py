@@ -38,8 +38,8 @@ def run_training():
         beta1=0.9,
         beta2=0.95,
         max_samples=320000000,
-        train_batch_size=512,
-        val_batch_size=16,
+        train_batch_size=16,
+        val_batch_size=8,
         context_length=256,
         device="cuda" if torch.cuda.is_available() else "cpu",
     )
@@ -50,8 +50,6 @@ def run_training():
         train_dataset_path="data/tinystories_train.npy",
         val_dataset_path="data/tinystories_val.npy",
     )
-
-    num_steps = 20000000
 
     progress = Progress(
         SpinnerColumn(),
@@ -65,22 +63,24 @@ def run_training():
         console=console,
     )
 
-    train_task = progress.add_task("[cyan]Training...", total=num_steps)
+    train_task = progress.add_task("[cyan]Training...", total=trainer.get_total_steps())
 
     with Live(progress, console=console, refresh_per_second=4):
-        for step_idx in range(num_steps):
+        for step_idx in range(trainer.get_total_steps()):
             val_loss = trainer.step()
 
             progress.update(train_task, advance=1)
 
             if step_idx % 10 == 0:
-                loss_val = val_loss.item()
+                loss_val = val_loss
                 color = "red" if loss_val > 20 else "green"
                 progress.update(train_task, description=f"[cyan]Step {step_idx} | Loss: [{color}]{loss_val:.4f}[/]")
 
             if step_idx % 2000 == 0:
                 progress.console.print(f"[bold yellow][{step_idx}][/] Saving checkpoint...")
                 save_checkpoint(trainer.model, trainer.optimizer, trainer.cur_step, "./data/checkpoint.pt")
+
+    trainer.finish()
 
 
 if __name__ == "__main__":

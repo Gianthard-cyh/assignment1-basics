@@ -1,3 +1,5 @@
+import math
+from pyexpat import model
 from cs336_basics.model.softmax import Softmax
 from cs336_basics.model.transformer import TransformerLM
 from cs336_basics.tokenizer.tokenizer import Tokenizer
@@ -7,7 +9,9 @@ from dataclasses import dataclass, asdict
 from cs336_basics.train.adam import AdamW
 import torch
 import numpy as np
+import swanlab
 
+from cs336_basics.train.gradient_clipping import clip_gradient
 from cs336_basics.train.lr_schedule import cosine_lr_schedule
 
 
@@ -40,6 +44,11 @@ class LMTrainer:
     def __init__(
         self, trainer_config: TrainerConfig, model_config: ModelConfig, train_dataset_path: str, val_dataset_path
     ):
+        swanlab.init(
+            project="CS336",
+            workspace="0xfe",
+            config={**asdict(trainer_config), **asdict(model_config)},
+        )
         torch.set_float32_matmul_precision("high")
         self.trainer_config = trainer_config
         self.model_config = model_config
@@ -58,11 +67,14 @@ class LMTrainer:
         self.train_dataset = np.memmap(self.train_dataset_path, dtype="int16", mode="r")
         self.val_dataset = np.memmap(self.val_dataset_path, dtype="int16", mode="r")
         print(f"- Train dataset: {len(self.train_dataset)} tokens")
-        self.total_steps = self.trainer_config.max_samples / self.trainer_config.train_batch_size
+        self.total_steps = int(math.ceil(self.trainer_config.max_samples / self.trainer_config.train_batch_size))
         self.cur_step = 1
         print(f"- total_steps: {self.total_steps}")
         for p in self.model.named_parameters():
             print(f"{p[0]}:{p[1].shape}")
+
+    def get_total_steps(self):
+        return self.total_steps
 
     def step(self):
         input_ids, labels = get_batch(
@@ -78,9 +90,16 @@ class LMTrainer:
         self.optimizer.zero_grad()
         loss = cross_entropy(logits, labels)
         loss.backward()
+        total_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=float("inf"))
+        clip_gradient(self.model.parameters(), 1.0)
+        clipped_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=float("inf"))
         self.optimizer.step()
         self.cur_step += 1
-        return self.test()
+        val_loss = self.test().item()
+        swanlab.log(
+            {"grad_norm": total_norm, "clipped_norm": clipped_norm, "train_loss": loss.item(), "val_loss": val_loss, "lr": lr}
+        )
+        return val_loss
 
     def test(self):
         with torch.no_grad():
@@ -93,3 +112,6 @@ class LMTrainer:
             logits = self.model(input_ids)
             loss = cross_entropy(logits, labels)
             return loss
+
+    def finish():
+        swanlab.finish()
